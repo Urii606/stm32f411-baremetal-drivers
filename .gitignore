@@ -1,0 +1,20 @@
+# Build output
+build/
+*.bin
+*.elf
+*.hex
+*.o
+*.obj
+*.d
+
+# STM32CubeMX / Eclipse internal files
+.settings/
+mx.scratch
+*.launch
+project-description.json
+stm32cubeide-export.json
+
+# IDE local configuration
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json

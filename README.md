@@ -2,23 +2,24 @@
 
 This repository contains modular, register-level bare-metal peripheral drivers and practical interfacing applications developed for the **STM32F411CEU6 (WeAct Black Pill)** microcontroller (ARM Cortex-M4).
 
-The low-level driver architecture is based on the FastBit Embedded Brain Academy model, focusing on register-level hardware control without vendor abstraction layers (HAL/LL).
+The low-level driver architecture is based on the FastBit Embedded Brain Academy model, focusing on direct register-level hardware control without vendor abstraction layers (HAL/LL).
 
 ---
 
-##  Features
+## 🛠 Features
 
-- **Direct Register Access:** Custom peripheral drivers written from scratch via memory-mapped structs.
+- **Direct Register Access:** Custom peripheral drivers written from scratch via memory-mapped peripheral structs.
 - **Hardware Peripherals Covered:**
-  - **GPIO:** Pin configuration, modes (Input, Output, Alternate Function, Analog), Pull-Up/Pull-Down, slew rate, and software debouncing.
-  - **I2C:** Master Transmitter mode (Standard Mode 100 kHz), clock control, ACK management, address generation, and flag handling.
-  - **SPI:** Master/Slave transmission, hardware SS control, full-duplex communication.
+  - **GPIO:** Pin configuration, modes (Input, Output, Alternate Function, Analog), Pull-Up/Pull-Down, speed configuration, and software debouncing.
+  - **I2C:** Master Transmitter mode (Standard Mode 100 kHz), clock control, ACK management, address generation, and status flag handling.
+  - **SPI:** Master/Slave transmission, hardware SS management, full-duplex communication.
+- **Toolchain:** Modern CMake + Ninja build system with `arm-none-eabi-gcc` cross-compiler and Cortex-Debug support in VS Code.
 
 ---
 
-##  Application Example: Button-Triggered I2C Transmission
+## 🚀 Application Example: Button-Triggered I2C Transmission
 
-The current main application demonstrates an I2C communication bridge between the STM32F411 Master and an external Slave (Arduino Uno).
+The current reference application demonstrates an I2C communication bridge between the STM32F411 Master and an external Slave (Arduino Uno).
 
 ### Hardware Wiring
 
@@ -31,28 +32,33 @@ The current main application demonstrates an I2C communication bridge between th
 
 ### Hardware Setup
 
-![Hardware Setup](docs/hardware_setup.jpg)
+<p align="center">
+  <img src="docs/hardware_setup.jpg" alt="STM32 to Arduino Hardware Setup" width="650">
+</p>
 
 ### Operation Logic
-1. Pin `PA0` is held high at 3.3V via internal Pull-Up.
+1. Pin `PA0` is held high at 3.3V via internal Pull-Up resistor.
 2. Pressing the on-board button pulls `PA0` to `GND` (Active-LOW).
-3. The software filters contact bounce via a verification delay (`btn_is_pressed`).
-4. Upon confirmation, the STM32 initiates a START condition, transmits the payload buffer to slave address `0x68`, and generates a STOP condition.
+3. The software filters mechanical contact bounce via verification delay (`btn_is_pressed`).
+4. Upon confirmation, the STM32 initiates a `START` condition, transmits the payload buffer (`"testdata"`) to slave address `0x68`, and generates a `STOP` condition.
 5. The loop waits for key release to prevent flood transmission.
 
 ---
 
 ### Protocol Verification (Logic Analyzer)
 
-The transaction timing and packet structure were verified using a logic analyzer on SCL and SDA lines:
+The bus transaction timing and packet integrity were verified using a logic analyzer on the SCL and SDA lines:
 
-docs/i2c_logic_capture.png
-![I2C Bus Logic Analyzer Capture](docs/i2c_logic_capture.jpg)
+<p align="center">
+  <img src="docs/i2c_logic_capture.jpg" alt="I2C Bus Logic Analyzer Capture" width="850">
+</p>
 
 - **Bus Speed:** 100 kHz (Standard Mode).
-- **Packet Sequence:** `START` to `Address (0x68 + W)` to `ACK` to `Payload Bytes` to `ACK` to `STOP`
+- **Packet Sequence:** `START` $\to$ `Address (0x68 + W)` $\to$ `ACK` $\to$ `testdata` $\to$ `ACK` $\to$ `STOP`.
 
-##  Repository Structure
+---
+
+## 📁 Repository Structure
 
 ```text
 ├── drivers/

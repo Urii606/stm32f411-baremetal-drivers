@@ -30,10 +30,6 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/files.cmake)
 
 # Add sources to executable/library
 target_sources(${PROJECT_NAME} PRIVATE
-  # User defined sources
-)
-
-target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     drivers/Src/main.c
     drivers/Src/syscall.c
     drivers/Src/sysmem.c
@@ -45,31 +41,29 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
-  # User defined include directories
-  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Inc
 )
 
 # Compiler options
 target_compile_options(${PROJECT_NAME} PRIVATE
-  # User defined compiler options
 )
 
 # Add additional defined symbols
 target_compile_definitions(${PROJECT_NAME} PRIVATE
-  # Add additional defined symbols here
 )
 
-# Linker options
-target_link_options(${PROJECT_NAME} PRIVATE 
-  # User defined linker options
+# Linker options (Standard embedded without Semihosting)
+target_link_options(${PROJECT_NAME} PRIVATE
+    --specs=nano.specs
+    --specs=nosys.specs
+    -lc
+    -lm
 )
 
 # Add additional linker search directories
 target_link_directories(${PROJECT_NAME} PRIVATE
-  # Add additional linker search directories here
 )
 
 # Add additional linker libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE
-  # Add additional linker libraries here
 )

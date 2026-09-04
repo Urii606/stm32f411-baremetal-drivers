@@ -41,6 +41,7 @@ static void i2c_module_init(void);
 static uint8_t btn_is_pressed(void);
 
 int main(void) {
+
     uint8_t commandcode, len;
 
     button_init();
@@ -50,16 +51,19 @@ int main(void) {
     while (1) {
 
         if (btn_is_pressed() == 1) {
+            while (GPIO_ReadFromInputPin(BTN_PORT, BTN_PIN) == BTN_PRESSED)
+                ;
             commandcode = 0x51;
-            I2C_MasterSendData(&s_i2c_handle, &commandcode, 1, SLAVE_ADDR);
+            I2C_MasterSendData(&s_i2c_handle, &commandcode, 1, SLAVE_ADDR,I2C_ENABLE_SR);
 
             delay_approx(50000);
 
-            I2C_MasterRecivedData(&s_i2c_handle, &len, 1, SLAVE_ADDR);
+            I2C_MasterRecivedData(&s_i2c_handle, &len, 1, SLAVE_ADDR, I2C_ENABLE_SR);
             commandcode = 0x52;
-            I2C_MasterSendData(&s_i2c_handle, &commandcode, 1, SLAVE_ADDR);
+            I2C_MasterSendData(&s_i2c_handle, &commandcode, 1, SLAVE_ADDR,
+                               I2C_ENABLE_SR);
 
-            I2C_MasterRecivedData(&s_i2c_handle, rcv_bfr, len, SLAVE_ADDR);
+            I2C_MasterRecivedData(&s_i2c_handle, rcv_bfr, len, SLAVE_ADDR,I2C_DISABLE_SR);
         }
     }
     return 0;

@@ -43,6 +43,9 @@
 #define I2C_SR1_OVR 11     /* Overrun/Underrun */
 #define I2C_SR1_TIMEOUT 14 /* Timeout or Tlow error */
 
+#define I2C_ENABLE_SR RESET
+#define I2C_DISABLE_SR SET
+
 /*
  * Bit position definitions for I2C_SR2 register
  */
@@ -127,9 +130,9 @@ void I2C_DeInit(I2C_RegDef_t *pI2Cx);
  * Data Send and Receive
  */
 void I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer,
-                        uint8_t Len, uint8_t SlaveAddr);
+                        uint8_t Len, uint8_t SlaveAddr, uint8_t Sr);
 void I2C_MasterRecivedData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer,
-                           uint8_t Len, uint8_t SlaveAddr);
+                           uint8_t Len, uint8_t SlaveAddr, uint8_t Sr);
 
 /*
  * IRQ Configuration and ISR handling

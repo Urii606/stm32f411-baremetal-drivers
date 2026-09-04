@@ -168,7 +168,7 @@ void I2C_DeInit(I2C_RegDef_t *pI2Cx) {
 }
 
 void I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer,
-                        uint8_t Len, uint8_t SlaveAddr) {
+                        uint8_t Len, uint8_t SlaveAddr, uint8_t Sr) {
     // 1. Генерація START
     I2C_GenerateStartCondition(pI2CHandle->pI2Cx);
 
@@ -202,11 +202,13 @@ void I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer,
         ;
 
     // 8. Генерація STOP
-    I2C_GenerateStopCondition(pI2CHandle->pI2Cx);
+    if (Sr == I2C_DISABLE_SR) {
+        I2C_GenerateStopCondition(pI2CHandle->pI2Cx);
+    }
 }
 
 void I2C_MasterRecivedData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer,
-                           uint8_t Len, uint8_t SlaveAddr) {
+                           uint8_t Len, uint8_t SlaveAddr, uint8_t Sr) {
     // 1. Generate the START condition
     I2C_GenerateStartCondition(pI2CHandle->pI2Cx);
 
@@ -232,7 +234,9 @@ void I2C_MasterRecivedData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer,
         I2C_ClearAddressFlag(pI2CHandle->pI2Cx);
 
         // generate STOP condition
-        I2C_GenerateStopCondition(pI2CHandle->pI2Cx);
+        if (Sr == I2C_DISABLE_SR) {
+            I2C_GenerateStopCondition(pI2CHandle->pI2Cx);
+        }
 
         // wait until RXNE becomes 1
         while (!I2C_GetFlagStatus(pI2CHandle->pI2Cx, I2C_FLAG_RXNE))
@@ -240,13 +244,6 @@ void I2C_MasterRecivedData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer,
 
         // read data in to buffer
         *pRxBuffer = pI2CHandle->pI2Cx->DR;
-
-        // re-enable ACKing
-        if (pI2CHandle->I2C_Config.I2C_ACKControl == I2C_ACK_ENABLE) {
-            I2C_ManageAcking(pI2CHandle->pI2Cx, I2C_ACK_ENABLE);
-        }
-
-        return;
     }
 
     // procedure to read data from slave when Len > 1
@@ -266,7 +263,9 @@ void I2C_MasterRecivedData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer,
                 I2C_ManageAcking(pI2CHandle->pI2Cx, I2C_ACK_DISABLE);
 
                 // generate stop condition
-                I2C_GenerateStopCondition(pI2CHandle->pI2Cx);
+                if (Sr == I2C_DISABLE_SR) {
+                    I2C_GenerateStopCondition(pI2CHandle->pI2Cx);
+                }
             }
 
             // read the data from data register in to buffer
@@ -276,11 +275,10 @@ void I2C_MasterRecivedData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer,
             pRxBuffer++;
             Len--;
         }
-
-        // re-enable ACKing
-        if (pI2CHandle->I2C_Config.I2C_ACKControl == I2C_ACK_ENABLE) {
-            I2C_ManageAcking(pI2CHandle->pI2Cx, I2C_ACK_ENABLE);
-        }
+    }
+    // re-enable ACKing
+    if (pI2CHandle->I2C_Config.I2C_ACKControl == I2C_ACK_ENABLE) {
+        I2C_ManageAcking(pI2CHandle->pI2Cx, I2C_ACK_ENABLE);
     }
 }
 

@@ -13,8 +13,8 @@ slave to read subsequent data from the slave.
 #include "stm32f411xx_i2c_driver.h"
 #include <stdint.h>
 
-// flag variable
-volatile uint8_t rxComplt = RESET;
+//flag variable
+uint8_t rxComplt = RESET;
 
 // Button description
 #define BTN_PORT GPIOA
@@ -30,8 +30,8 @@ volatile uint8_t rxComplt = RESET;
 #define SLAVE_ADDR 0x68
 #define OWN_ADDR 0x61
 
-// Module handles
-static I2C_Handle_t s_i2c_handle;
+    // Module handles
+    static I2C_Handle_t s_i2c_handle;
 
 // recive buffer
 uint8_t rcv_bfr[32];
@@ -62,14 +62,11 @@ int main(void) {
             commandcode = 0x51;
             while (I2C_MasterSendDataIT(&s_i2c_handle, &commandcode, 1,
                                         SLAVE_ADDR, I2C_ENABLE_SR) != I2C_READY)
-
                 ;
-            rxComplt = RESET;
             while (I2C_MasterRecivedDataIT(&s_i2c_handle, &len, 1, SLAVE_ADDR,
                                            I2C_ENABLE_SR) != I2C_READY)
                 ;
-            while (rxComplt != SET) {
-            }
+
             commandcode = 0x52;
             while (I2C_MasterSendDataIT(&s_i2c_handle, &commandcode, 1,
                                         SLAVE_ADDR, I2C_ENABLE_SR))
@@ -78,18 +75,17 @@ int main(void) {
             while (I2C_MasterRecivedDataIT(&s_i2c_handle, rcv_bfr, len,
                                            SLAVE_ADDR, I2C_DISABLE_SR))
                 ;
-            rxComplt = RESET;
-            // wait till rx completes
-            while (rxComplt != SET) {
-            }
-            rxComplt = RESET;
+                rxComplt = RESET;
+                //wait till rx completes
+                while(rxComplt != SET){}
+rxComplt=RESET;
         }
     }
     return 0;
 }
 
 void delay_approx(uint32_t count) {
-    for (uint32_t i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++) {
         __asm volatile("nop");
     }
 }
@@ -149,20 +145,22 @@ static uint8_t btn_is_pressed(void) {
     return 0;
 }
 
-void I2C1_ER_IRQHandler(void) 
-{ I2C_ER_IRQHandling(&s_i2c_handle); }
-void I2C1_EV_IRQHandler(void) { I2C_EV_IRQHandling(&s_i2c_handle); }
+void I2C1_ER_IRQHanler(void) { I2C_ER_IRQHandling(&s_i2c_handle); }
+void I2C1_EV_IRQHanler(void) { I2C_EV_IRQHandling(&s_i2c_handle); }
 
-void I2C_ApplicationEventCallback(I2C_Handle_t *pI2CHandle, uint8_t AppEv) {
-    if (AppEv == I2C_EV_TX_CMPLT) {
+void I2C_ApplicationEventCallback(I2C_Handle_t *pI2CHandle, uint8_t AppEv)
+{
+    if(AppEv == I2C_EV_TX_CMPLT)
+    {
 
-    } else if (AppEv == I2C_EV_RX_CMPLT) {
-        rxComplt = SET;
-    } else if (AppEv == I2C_ERROR_AF) {
+    }else if(AppEv == I2C_EV_RX_CMPLT)
+    {
+        rxComplt=SET;
+    }else if(AppEv==I2C_ERROR_AF)
+    {
         I2C_CloseRecieveData(pI2CHandle);
         I2C_GenerateStopCondition(pI2CHandle->pI2Cx);
 
-        while (1)
-            ;
+        while(1);
     }
 }

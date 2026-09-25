@@ -2,18 +2,13 @@
 #include "stm32f411xx.h"
 #include <stdint.h>
 
-uint16_t AHB_PreSceler[] = {2, 4, 8, 16, 32, 64, 128, 256, 512};
-uint16_t APB1_PreSceler[4] = {2, 4, 8, 16};
-
 static void I2C_GenerateStartCondition(I2C_RegDef_t *pI2Cx);
-static void I2C_ExecuteAddressPhaseWrite(I2C_RegDef_t *pI2Cx,
-                                         uint8_t SlaveAddr);
+static void I2C_ExecuteAddressPhaseWrite(I2C_RegDef_t *pI2Cx, uint8_t SlaveAddr);
 static void I2C_ExecuteAddressPhaseRead(I2C_RegDef_t *pI2Cx, uint8_t SlaveAddr);
 static void I2C_ClearAddressFlag(I2C_Handle_t *pI2CHandle);
 static void I2C_MasterHandleRXNEInterrupt(I2C_Handle_t *pI2CHandle);
 static void I2C_MasterHandleTXEInterrupt(I2C_Handle_t *pI2CHandle);
 
-uint32_t RCC_GetPLLOutputClock(void) { return 16000000U; }
 
 uint8_t I2C_GetFlagStatus(I2C_RegDef_t *pI2Cx, uint32_t FlagName) {
     if (pI2Cx->SR1 & FlagName) {
@@ -22,19 +17,15 @@ uint8_t I2C_GetFlagStatus(I2C_RegDef_t *pI2Cx, uint32_t FlagName) {
     return FLAG_RESET;
 }
 
-static void I2C_GenerateStartCondition(I2C_RegDef_t *pI2Cx) {
-    pI2Cx->CR1 |= (1 << I2C_CR1_START);
-}
+static void I2C_GenerateStartCondition(I2C_RegDef_t *pI2Cx) { pI2Cx->CR1 |= (1 << I2C_CR1_START); }
 
-static void I2C_ExecuteAddressPhaseWrite(I2C_RegDef_t *pI2Cx,
-                                         uint8_t SlaveAddr) {
+static void I2C_ExecuteAddressPhaseWrite(I2C_RegDef_t *pI2Cx, uint8_t SlaveAddr) {
     SlaveAddr = (SlaveAddr << 1);
     SlaveAddr &= ~(1 << 0); // r/nw bit = 0 (Write)
     pI2Cx->DR = SlaveAddr;
 }
 
-static void I2C_ExecuteAddressPhaseRead(I2C_RegDef_t *pI2Cx,
-                                        uint8_t SlaveAddr) {
+static void I2C_ExecuteAddressPhaseRead(I2C_RegDef_t *pI2Cx, uint8_t SlaveAddr) {
     SlaveAddr = (SlaveAddr << 1);
     SlaveAddr |= 1; // r/nw bit = 0 (Write)
     pI2Cx->DR = SlaveAddr;
@@ -72,42 +63,7 @@ static void I2C_ClearAddressFlag(I2C_Handle_t *pI2CHandle) {
     }
 }
 
-void I2C_GenerateStopCondition(I2C_RegDef_t *pI2Cx) {
-    pI2Cx->CR1 |= (1 << I2C_CR1_STOP);
-}
-
-uint32_t RCC_GetPCLK1Value(void) {
-    uint32_t pclk1 = 0, systemClk = 0;
-    uint8_t clksrc, temp, ahbp, apb1;
-
-    clksrc = ((RCC->CFGR >> 2) & 0x3);
-    if (clksrc == 0) {
-        systemClk = 16000000U; // HSI = 16 MHz
-    } else if (clksrc == 1) {
-        systemClk = 8000000U; // HSE = 8 MHz
-    } else if (clksrc == 2) {
-        systemClk = RCC_GetPLLOutputClock();
-    }
-
-    // AHB Prescaler
-    temp = ((RCC->CFGR >> 4) & 0xF);
-    if (temp < 8) {
-        ahbp = 1;
-    } else {
-        ahbp = AHB_PreSceler[temp - 8];
-    }
-
-    // APB1 Prescaler
-    temp = ((RCC->CFGR >> 10) & 0x7);
-    if (temp < 4) {
-        apb1 = 1;
-    } else {
-        apb1 = APB1_PreSceler[temp - 4];
-    }
-
-    pclk1 = (systemClk / ahbp) / apb1;
-    return pclk1;
-}
+void I2C_GenerateStopCondition(I2C_RegDef_t *pI2Cx) { pI2Cx->CR1 |= (1 << I2C_CR1_STOP); }
 
 void I2C_PeripheralClockControl(I2C_RegDef_t *pI2Cx, uint8_t EnOrDi) {
     if (EnOrDi == ENABLE) {
@@ -153,8 +109,7 @@ void I2C_Init(I2C_Handle_t *pI2CHandle) {
 
     if (pI2CHandle->I2C_Config.I2C_SCLSpeed <= I2C_SCL_SPEED_SM) {
         // Standard Mode (SM <= 100 kHz)
-        ccr_value =
-            (RCC_GetPCLK1Value() / (2 * pI2CHandle->I2C_Config.I2C_SCLSpeed));
+        ccr_value = (RCC_GetPCLK1Value() / (2 * pI2CHandle->I2C_Config.I2C_SCLSpeed));
         tempreg |= (ccr_value & 0xFFF);
     } else {
         // Fast Mode (FM)
@@ -162,11 +117,9 @@ void I2C_Init(I2C_Handle_t *pI2CHandle) {
         tempreg |= (pI2CHandle->I2C_Config.I2C_FMDutyCycle << 14);
 
         if (pI2CHandle->I2C_Config.I2C_FMDutyCycle == I2C_FM_DUTY_2) {
-            ccr_value = (RCC_GetPCLK1Value() /
-                         (3 * pI2CHandle->I2C_Config.I2C_SCLSpeed));
+            ccr_value = (RCC_GetPCLK1Value() / (3 * pI2CHandle->I2C_Config.I2C_SCLSpeed));
         } else {
-            ccr_value = (RCC_GetPCLK1Value() /
-                         (25 * pI2CHandle->I2C_Config.I2C_SCLSpeed));
+            ccr_value = (RCC_GetPCLK1Value() / (25 * pI2CHandle->I2C_Config.I2C_SCLSpeed));
         }
         tempreg |= (ccr_value & 0xFFF);
     }
@@ -193,8 +146,7 @@ void I2C_DeInit(I2C_RegDef_t *pI2Cx) {
     }
 }
 
-void I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer,
-                        uint8_t Len, uint8_t SlaveAddr, uint8_t Sr) {
+void I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer, uint8_t Len, uint8_t SlaveAddr, uint8_t Sr) {
     // 1. Генерація START
     I2C_GenerateStartCondition(pI2CHandle->pI2Cx);
 
@@ -233,8 +185,7 @@ void I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer,
     }
 }
 
-void I2C_MasterRecivedData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer,
-                           uint8_t Len, uint8_t SlaveAddr, uint8_t Sr) {
+void I2C_MasterRecivedData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer, uint8_t Len, uint8_t SlaveAddr, uint8_t Sr) {
     // 1. Generate the START condition
     I2C_GenerateStartCondition(pI2CHandle->pI2Cx);
 
@@ -310,8 +261,7 @@ void I2C_MasterRecivedData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer,
     }
 }
 
-uint8_t I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer,
-                             uint8_t Len, uint8_t SlaveAddr, uint8_t Sr) {
+uint8_t I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer, uint8_t Len, uint8_t SlaveAddr, uint8_t Sr) {
     uint8_t busystate = pI2CHandle->TxRxState;
 
     if ((busystate != I2C_BUSY_IN_TX) && (busystate != I2C_BUSY_IN_RX)) {
@@ -335,8 +285,7 @@ uint8_t I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer,
     }
     return busystate;
 }
-uint8_t I2C_MasterRecivedDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer,
-                                uint8_t Len, uint8_t SlaveAddr, uint8_t Sr) {
+uint8_t I2C_MasterRecivedDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer, uint8_t Len, uint8_t SlaveAddr, uint8_t Sr) {
     uint8_t busystate = pI2CHandle->TxRxState;
 
     if ((busystate != I2C_BUSY_IN_RX) && (busystate != I2C_BUSY_IN_TX)) {
@@ -492,8 +441,7 @@ void I2C_EV_IRQHandling(I2C_Handle_t *pI2CHandle) {
         // will not be executed in slave mode because for slave SB is always
         // zero adress phase
         if (pI2CHandle->TxRxState == I2C_BUSY_IN_TX) {
-            I2C_ExecuteAddressPhaseWrite(pI2CHandle->pI2Cx,
-                                         pI2CHandle->DevAddr);
+            I2C_ExecuteAddressPhaseWrite(pI2CHandle->pI2Cx, pI2CHandle->DevAddr);
         } else if (pI2CHandle->TxRxState == I2C_BUSY_IN_RX) {
             I2C_ExecuteAddressPhaseRead(pI2CHandle->pI2Cx, pI2CHandle->DevAddr);
         }
@@ -557,6 +505,12 @@ void I2C_EV_IRQHandling(I2C_Handle_t *pI2CHandle) {
             if (pI2CHandle->TxRxState == I2C_BUSY_IN_TX) {
                 I2C_MasterHandleTXEInterrupt(pI2CHandle);
             }
+        } else {
+            // slave
+            // make sure that the transmitter is really in transmitter mode
+            if (pI2CHandle->pI2Cx->SR2 & (1 << I2C_SR2_TRA)) {
+                I2C_ApplicationEventCallback(pI2CHandle, I2C_EV_DATA_REQ);
+            }
         }
     }
 
@@ -570,6 +524,11 @@ void I2C_EV_IRQHandling(I2C_Handle_t *pI2CHandle) {
             // RXNE flag is set
             if (pI2CHandle->TxRxState == I2C_BUSY_IN_RX) {
                 I2C_MasterHandleRXNEInterrupt(pI2CHandle);
+            }
+        } else {
+            // slave mode
+            if (pI2CHandle->pI2Cx->SR2 & (1 << I2C_SR2_TRA)) {
+                I2C_ApplicationEventCallback(pI2CHandle, I2C_EV_DATA_RCV);
             }
         }
     }
@@ -630,5 +589,20 @@ void I2C_ER_IRQHandling(I2C_Handle_t *pI2CHandle) {
         pI2CHandle->pI2Cx->SR1 &= ~(1 << I2C_SR1_TIMEOUT);
         // notify the application about the error
         I2C_ApplicationEventCallback(pI2CHandle, I2C_ERROR_TIMEOUT);
+    }
+}
+
+void I2C_SlaveSendData(I2C_RegDef_t *pI2C, uint8_t data) { pI2C->DR = data; }
+uint8_t I2C_SlaveRecivedData(I2C_RegDef_t *pI2C) { return (uint8_t)pI2C->DR; }
+
+void I2C_SlaveEnableDisableCallbackEvents(I2C_RegDef_t *pI2Cx, uint8_t EnorDI) {
+    if (EnorDI == ENABLE) {
+        pI2Cx->CR2 |= (1 << I2C_CR2_ITBUFEN);
+        pI2Cx->CR2 |= (1 << I2C_CR2_ITEVTEN);
+        pI2Cx->CR2 |= (1 << I2C_CR2_ITERREN);
+    } else {
+        pI2Cx->CR2 &= ~(1 << I2C_CR2_ITBUFEN);
+        pI2Cx->CR2 &= ~(1 << I2C_CR2_ITEVTEN);
+        pI2Cx->CR2 &= ~(1 << I2C_CR2_ITERREN);
     }
 }

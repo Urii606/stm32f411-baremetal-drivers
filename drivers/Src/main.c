@@ -1,168 +1,96 @@
-/*
-12C Master(STM) and 12C Slave(Arduino) communication .
-
-When button on the master is pressed , master should read and display data from
-Arduino Slave connected. First master has to get the length of the data from the
-slave to read subsequent data from the slave.
-1. Use 12C SCL = 100KHz(Standard mode )
-2. Use internal pull resistors for SDA and SCL lines
-*/
-
 #include "stm32f411xx.h"
 #include "stm32f411xx_gpio_driver.h"
-#include "stm32f411xx_i2c_driver.h"
-#include <stdint.h>
+#include "stm32f411xx_usart_driver.h"
+#include <string.h>
 
-// flag variable
-volatile uint8_t rxComplt = RESET;
+void delay_approx(uint32_t count);
+void USART2_GPIOInit(void);
+void USART2_Init(void);
+void GPIO_ButtonInit(void);
 
-// Button description
-#define BTN_PORT GPIOA
-#define BTN_PIN GPIO_PIN_NO_0
-#define BTN_PRESSED 0
+char msg[1024] = "UART Tx testing...\n\r";
 
-// I2C pins: SCL-PB6 SDA-PB7
-#define I2C_GPIO_PORT GPIOB
-#define I2C_SCL_PIN GPIO_PIN_NO_6
-#define I2C_SDA_PIN GPIO_PIN_NO_7
-#define I2C_AF_MODE 4
-
-#define SLAVE_ADDR 0x68
-#define OWN_ADDR 0x61
-
-// Module handles
-static I2C_Handle_t s_i2c_handle;
-
-// recive buffer
-uint8_t rcv_bfr[32];
-
-// private functions prototype
-static void delay_approx(uint32_t count);
-static void button_init(void);
-static void i2c_gpio_init(void);
-static void i2c_module_init(void);
-static uint8_t btn_is_pressed(void);
+// 2pins (TX/RX)
+// USART2_TX - pa2
+// SART2_RX    pa3
+// af = 7
+USART_Handle_t usart2_handle;
 
 int main(void) {
-    uint8_t commandcode, len;
+    GPIO_ButtonInit();
+    USART2_GPIOInit();
+    USART_PeriClockControl(USART2, ENABLE);
+    USART2_Init();
 
-    button_init();
-    i2c_gpio_init();
-    I2C_IRQInterruptConfig(IRQ_NO_I2C1_EV, ENABLE);
-    I2C_IRQInterruptConfig(IRQ_NO_I2C1_ER, ENABLE);
-
-    i2c_module_init();
-
-    I2C_ManageAcking(s_i2c_handle.pI2Cx, ENABLE);
+    USART_PeripheralControl(USART2, ENABLE);
     while (1) {
+        // wait till button is pressed
+        while (GPIO_ReadFromInputPin(GPIOA, GPIO_PIN_NO_0) != 0)
+            ;
 
-        if (btn_is_pressed() == 1) {
-            while (GPIO_ReadFromInputPin(BTN_PORT, BTN_PIN) == 0)
-                ;
-            commandcode = 0x51;
-            while (I2C_MasterSendDataIT(&s_i2c_handle, &commandcode, 1,
-                                        SLAVE_ADDR, I2C_ENABLE_SR) != I2C_READY)
+        // to avoid button de-bouncing related issues 200ms of delay
+        delay_approx(200);
 
-                ;
-            rxComplt = RESET;
-            while (I2C_MasterRecivedDataIT(&s_i2c_handle, &len, 1, SLAVE_ADDR,
-                                           I2C_ENABLE_SR) != I2C_READY)
-                ;
-            while (rxComplt != SET) {
-            }
-            commandcode = 0x52;
-            while (I2C_MasterSendDataIT(&s_i2c_handle, &commandcode, 1,
-                                        SLAVE_ADDR, I2C_ENABLE_SR))
-                ;
+        USART_SendData(&usart2_handle, (uint8_t *)msg, strlen(msg));
 
-            while (I2C_MasterRecivedDataIT(&s_i2c_handle, rcv_bfr, len,
-                                           SLAVE_ADDR, I2C_DISABLE_SR))
-                ;
-            rxComplt = RESET;
-            // wait till rx completes
-            while (rxComplt != SET) {
-            }
-            rxComplt = RESET;
-        }
+        while (GPIO_ReadFromInputPin(GPIOA, GPIO_PIN_NO_0) == 0)
+            ;
+
+        delay_approx(50);
     }
     return 0;
+}
+
+void USART2_GPIOInit(void) {
+    GPIO_Handle_t usart_gpios;
+    usart_gpios.pGPIOx = GPIOA;
+    usart_gpios.GPIO_PinConfig.GPIO_PinMode = GPIO_MODE_ALTFN;
+    usart_gpios.GPIO_PinConfig.GPIO_PinOPType = GPIO_OP_TYPE_PP;
+    usart_gpios.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_PIN_PU;
+    usart_gpios.GPIO_PinConfig.GPIO_PinSpeed = GPIO_SPEED_FAST;
+    usart_gpios.GPIO_PinConfig.GPIO_PinAltFunMode = 7;
+
+    // usart TX
+    usart_gpios.GPIO_PinConfig.GPIO_PinNumber = GPIO_PIN_NO_2;
+    GPIO_Init(&usart_gpios);
+
+    // usart RX
+    usart_gpios.GPIO_PinConfig.GPIO_PinNumber = GPIO_PIN_NO_3;
+    GPIO_Init(&usart_gpios);
+}
+
+void USART2_Init(void) {
+    usart2_handle.pUSARTx = USART2;
+    usart2_handle.USART_Config.USART_Baud = USART_STD_BAUD_115200;
+    usart2_handle.USART_Config.USART_HWFlowControl = USART_HW_FLOW_CTRL_NONE;
+    usart2_handle.USART_Config.USART_Mode = USART_MODE_ONLY_TX;
+    usart2_handle.USART_Config.USART_NoOfStopBits = USART_STOPBITS_1;
+    usart2_handle.USART_Config.USART_WordLength = USART_WORDLEN_8BITS;
+    usart2_handle.USART_Config.USART_ParityControl = USART_PARITY_DISABLE;
+
+    USART_Init(&usart2_handle);
+}
+
+void GPIO_ButtonInit(void) {
+    GPIO_Handle_t button, led;
+    button.pGPIOx = GPIOA;
+    button.GPIO_PinConfig.GPIO_PinMode = GPIO_MODE_INPUT;
+    button.GPIO_PinConfig.GPIO_PinNumber = GPIO_PIN_NO_0;
+    button.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_PIN_PU;
+    button.GPIO_PinConfig.GPIO_PinSpeed = GPIO_SPEED_FAST;
+    GPIO_Init(&button);
+
+    led.pGPIOx = GPIOC;
+    led.GPIO_PinConfig.GPIO_PinMode = GPIO_MODE_OUT;
+    led.GPIO_PinConfig.GPIO_PinNumber = GPIO_PIN_NO_13;
+    led.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_NO_PUPD;
+    led.GPIO_PinConfig.GPIO_PinOPType = GPIO_OP_TYPE_OD;
+    led.GPIO_PinConfig.GPIO_PinSpeed = GPIO_SPEED_FAST;
+    GPIO_Init(&led);
 }
 
 void delay_approx(uint32_t count) {
-    for (uint32_t i = 0; i < count; i++) {
+    for (uint32_t i = 0; i < (count * 2000); i++) {
         __asm volatile("nop");
-    }
-}
-
-void button_init(void) {
-    GPIO_Handle_t btn;
-    GPIO_PeripheralClockControl(BTN_PORT, ENABLE);
-
-    btn.pGPIOx = BTN_PORT;
-    btn.GPIO_PinConfig.GPIO_PinNumber = BTN_PIN;
-    btn.GPIO_PinConfig.GPIO_PinSpeed = GPIO_SPEED_LOW;
-    btn.GPIO_PinConfig.GPIO_PinMode = GPIO_MODE_INPUT;
-    btn.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_PIN_PU;
-
-    GPIO_Init(&btn);
-}
-
-void i2c_gpio_init(void) {
-    GPIO_Handle_t i2c_pins;
-    GPIO_PeripheralClockControl(I2C_GPIO_PORT, ENABLE);
-
-    i2c_pins.pGPIOx = I2C_GPIO_PORT;
-    i2c_pins.GPIO_PinConfig.GPIO_PinMode = GPIO_MODE_ALTFN;
-    i2c_pins.GPIO_PinConfig.GPIO_PinAltFunMode = I2C_AF_MODE;
-    i2c_pins.GPIO_PinConfig.GPIO_PinSpeed = GPIO_SPEED_FAST;
-    i2c_pins.GPIO_PinConfig.GPIO_PinOPType = GPIO_OP_TYPE_OD;
-    i2c_pins.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_PIN_PU;
-
-    i2c_pins.GPIO_PinConfig.GPIO_PinNumber = I2C_SCL_PIN;
-    GPIO_Init(&i2c_pins);
-
-    i2c_pins.GPIO_PinConfig.GPIO_PinNumber = I2C_SDA_PIN;
-    GPIO_Init(&i2c_pins);
-}
-
-void i2c_module_init(void) {
-    s_i2c_handle.pI2Cx = I2C1;
-    s_i2c_handle.I2C_Config.I2C_ACKControl = I2C_ACK_ENABLE;
-    s_i2c_handle.I2C_Config.I2C_DeviceAddress = OWN_ADDR;
-    s_i2c_handle.I2C_Config.I2C_FMDutyCycle = 0;
-    s_i2c_handle.I2C_Config.I2C_SCLSpeed = I2C_SCL_SPEED_SM;
-
-    I2C_PeripheralClockControl(s_i2c_handle.pI2Cx, ENABLE);
-
-    I2C_Init(&s_i2c_handle);
-
-    I2C_PeripheralControl(s_i2c_handle.pI2Cx, ENABLE);
-}
-
-static uint8_t btn_is_pressed(void) {
-    if (GPIO_ReadFromInputPin(BTN_PORT, BTN_PIN) == 0) {
-        delay_approx(250000);
-        if (GPIO_ReadFromInputPin(BTN_PORT, BTN_PIN) == 0) {
-            return 1;
-        }
-    }
-    return 0;
-}
-
-void I2C1_ER_IRQHandler(void) 
-{ I2C_ER_IRQHandling(&s_i2c_handle); }
-void I2C1_EV_IRQHandler(void) { I2C_EV_IRQHandling(&s_i2c_handle); }
-
-void I2C_ApplicationEventCallback(I2C_Handle_t *pI2CHandle, uint8_t AppEv) {
-    if (AppEv == I2C_EV_TX_CMPLT) {
-
-    } else if (AppEv == I2C_EV_RX_CMPLT) {
-        rxComplt = SET;
-    } else if (AppEv == I2C_ERROR_AF) {
-        I2C_CloseRecieveData(pI2CHandle);
-        I2C_GenerateStopCondition(pI2CHandle->pI2Cx);
-
-        while (1)
-            ;
     }
 }

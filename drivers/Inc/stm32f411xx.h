@@ -202,6 +202,17 @@ typedef struct {
     __vo uint32_t FLTR;
 } I2C_RegDef_t;
 
+// peripheral register definition structure for USART
+typedef struct {
+    __vo uint32_t SR;
+    __vo uint32_t DR;
+    __vo uint32_t BRR;
+    __vo uint32_t CR1;
+    __vo uint32_t CR2;
+    __vo uint32_t CR3;
+    __vo uint32_t GTPR;
+} USART_RegDef_t;
+
 /*
  * peripheral definitions
  * */
@@ -223,6 +234,13 @@ typedef struct {
 #define I2C1 ((I2C_RegDef_t *)I2C1_BASEADDR)
 #define I2C2 ((I2C_RegDef_t *)I2C2_BASEADDR)
 #define I2C3 ((I2C_RegDef_t *)I2C3_BASEADDR)
+
+#define USART1 ((USART_RegDef_t *)USART1_BASEADDR)
+#define USART2 ((USART_RegDef_t *)USART2_BASEADDR)
+#define USART3 ((USART_RegDef_t *)USART3_BASEADDR)
+#define UART4 ((USART_RegDef_t *)UART4_BASEADDR)
+#define UART5 ((USART_RegDef_t *)UART5_BASEADDR)
+#define USART6 ((USART_RegDef_t *)USART6_BASEADDR)
 
 /*
  * Clock enable macros for GPIOx peripherals
@@ -372,6 +390,25 @@ typedef struct {
         (RCC->APB1RSTR &= ~(1 << 23));                                         \
     } while (0)
 
+/*
+ * Macros to reset USARTx peripherals
+ */
+#define USART1_REG_RESET()                                                     \
+    do {                                                                       \
+        (RCC->APB1RSTR |= (1 << 4));                                           \
+        (RCC->APB1RSTR &= ~(1 << 4));                                          \
+    } while (0)
+#define USART2_REG_RESET()                                                     \
+    do {                                                                       \
+        (RCC->APB1RSTR |= (1 << 17));                                          \
+        (RCC->APB1RSTR &= ~(1 << 17));                                         \
+    } while (0)
+#define USART6_REG_RESET()                                                    \
+    do {                                                                       \
+        (RCC->APB1RSTR |= (1 << 5));                                           \
+        (RCC->APB1RSTR &= ~(1 << 5));                                          \
+    } while (0)
+
 #define GPIO_BASEADDR_TO_CODE(x)                                               \
     ((x == GPIOA)   ? 0                                                        \
      : (x == GPIOB) ? 1                                                        \
@@ -394,12 +431,15 @@ typedef struct {
 #define IRQ_NO_SPI3 51
 #define IRQ_NO_SPI4 84
 #define IRQ_NO_SPI5 85
-#define IRQ_NO_I2C1_EV  31
-#define IRQ_NO_I2C1_ER  32
-#define IRQ_NO_I2C2_EV  33
-#define IRQ_NO_I2C2_ER  34
-#define IRQ_NO_I2C3_EV  72
-#define IRQ_NO_I2C3_ER  73
+#define IRQ_NO_I2C1_EV 31
+#define IRQ_NO_I2C1_ER 32
+#define IRQ_NO_I2C2_EV 33
+#define IRQ_NO_I2C2_ER 34
+#define IRQ_NO_I2C3_EV 72
+#define IRQ_NO_I2C3_ER 73
+#define IRQ_NO_USART1 37
+#define IRQ_NO_USART2 38
+#define IRQ_NO_USART6 71
 
 // macros for all possible priority levels
 #define NVIC_IRQ_PRIO0 0
@@ -431,6 +471,9 @@ typedef struct {
 
 #include "stm32f411xx_gpio_driver.h"
 #include "stm32f411xx_i2c_driver.h"
+#include "stm32f411xx_rcc_driver.h"
 #include "stm32f411xx_spi_driver.h"
+#include "stm32f411xx_usart_driver.h"
+
 
 #endif /* INC_STM32F411XX_H_ */

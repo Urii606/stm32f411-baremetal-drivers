@@ -175,26 +175,23 @@ void USART_ReceiveData(USART_Handle_t *pUSARTHandle, uint8_t *pRxBuffer, uint32_
 uint8_t USART_SendDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pTxBuffer, uint32_t Len) {
     uint8_t txstate = pUSARTHandle->TxBusyState;
 
-    if(txstate != USART_BUSY_IN_TX)
-    {
+    if (txstate != USART_BUSY_IN_TX) {
         pUSARTHandle->TxLen = Len;
         pUSARTHandle->pTxBuffer = pTxBuffer;
         pUSARTHandle->TxBusyState = USART_BUSY_IN_TX;
 
-        pUSARTHandle->pUSARTx->CR1 |= (1<<USART_CR1_TXEIE);
+        pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_TXEIE);
     }
     return txstate;
 }
-uint8_t USART_ReceiveDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pRxBuffer, uint32_t Len)
-{
+uint8_t USART_ReceiveDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pRxBuffer, uint32_t Len) {
     uint8_t rxstate = pUSARTHandle->RxBusyState;
-    if(rxstate != USART_BUSY_IN_RX)
-    {
-        pUSARTHandle->RxLen= Len;
+    if (rxstate != USART_BUSY_IN_RX) {
+        pUSARTHandle->RxLen = Len;
         pUSARTHandle->pRxBuffer = pRxBuffer;
         pUSARTHandle->RxBusyState = USART_BUSY_IN_RX;
 
-        pUSARTHandle->pUSARTx->CR1 |= (1<<USART_CR1_RXNEIE);
+        pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_RXNEIE);
     }
     return rxstate;
 }
@@ -202,9 +199,198 @@ uint8_t USART_ReceiveDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pRxBuffer, ui
 /*
  * IRQ Configuration and ISR handling
  */
-void USART_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi);
-void USART_IRQPriorityConfig(uint8_t IRQNumber, uint32_t IRQPriority);
-void USART_IRQHandling(USART_Handle_t *pUSARTHandle);
+void USART_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi) {
+    if (EnorDi == ENABLE) {
+        if (IRQNumber <= 31) {
+            *NVIC_ISER0 |= (1 << IRQNumber);
+        } else if (IRQNumber >= 32 && IRQNumber < 64) {
+            *NVIC_ISER1 |= (1 << (IRQNumber % 32));
+        } else if (IRQNumber >= 64 && IRQNumber < 96) {
+            *NVIC_ISER2 |= (1 << (IRQNumber % 32));
+        }
+    } else {
+        {
+            if (IRQNumber <= 31) {
+                *NVIC_ICER0 |= (1 << IRQNumber);
+            } else if (IRQNumber >= 32 && IRQNumber < 64) {
+                *NVIC_ICER1 |= (1 << (IRQNumber % 32));
+            } else if (IRQNumber >= 64 && IRQNumber < 96) {
+                *NVIC_ICER2 |= (1 << (IRQNumber % 32));
+            }
+        }
+    }
+}
+void USART_IRQPriorityConfig(uint8_t IRQNumber, uint32_t IRQPriority) {
+    // 1. first lets find out the ipr register
+    uint8_t iprx = IRQNumber / 4;         // find nuber of right register
+    uint8_t iprx_section = IRQNumber % 4; // defines section
+
+    uint8_t shift_amount = (8 * iprx_section) + (8 - NO_PR_BITS_IMPLEMENTED);
+
+    *(NVIC_PR_BASE_ADDR + iprx) &= ~(IRQPriority << shift_amount);
+    *(NVIC_PR_BASE_ADDR + iprx) |= (IRQPriority << shift_amount);
+}
+void USART_IRQHandling(USART_Handle_t *pUSARTHandle) {
+    uint32_t temp1, temp2, temp3;
+
+    uint16_t *pdata;
+
+    /*************************Check for TC flag ********************************************/
+    // Implement the code to check the state of TC bit in the SR
+    temp1 = pUSARTHandle->pUSARTx->SR & (1 << USART_SR_TC);
+
+    // Implement the code to check the state of TCEIE bit
+    temp2 = pUSARTHandle->pUSARTx->CR1 & (1 << USART_CR1_TCIE);
+
+    if (temp1 && temp2) {
+        // this interrupt is because of TC
+
+        // close transmission and call application callback if TxLen is zero
+        if (pUSARTHandle->TxBusyState == USART_BUSY_IN_TX) {
+            // Check the TxLen . If it is zero then close the data transmission
+            if (pUSARTHandle->TxLen == 0) {
+                // Implement the code to clear the TC flag
+                pUSARTHandle->pUSARTx->SR &= ~(1 << USART_SR_TC);
+                // Implement the code to clear the TCIE control bit
+                pUSARTHandle->pUSARTx->CR1 &= ~(1 << USART_CR1_TCIE);
+                // Reset the application state
+                pUSARTHandle->TxBusyState = USART_READY;
+                // Reset Buffer address to NULL
+                pUSARTHandle->pTxBuffer = NULL;
+                // Reset the length to zero
+                pUSARTHandle->TxLen = 0;
+                // Call the application call back with event USART_EVENT_TX_CMPLT
+                USART_ApplicationEventCallback(pUSARTHandle, USART_EVENT_TX_CMPLT);
+            }
+        }
+    }
+
+    /*************************Check for TXE flag ********************************************/
+
+    temp1 = pUSARTHandle->pUSARTx->SR & (1 << USART_SR_TXE);
+
+    temp2 = pUSARTHandle->pUSARTx->CR1 & (1 << USART_CR1_TXEIE);
+
+    if (temp1 && temp2) {
+        if (pUSARTHandle->TxBusyState == USART_BUSY_IN_TX) {
+            if (pUSARTHandle->TxLen > 0) {
+                if (pUSARTHandle->USART_Config.USART_WordLength == USART_WORDLEN_9BITS) {
+                    pdata = pUSARTHandle->pTxBuffer;
+                    pUSARTHandle->pUSARTx->DR = (*pdata & 0x01FF);
+
+                    if (pUSARTHandle->USART_Config.USART_ParityControl == USART_PARITY_DISABLE) {
+                        pUSARTHandle->pTxBuffer++;
+                        pUSARTHandle->pTxBuffer++;
+                        pUSARTHandle->TxLen -= 2;
+                    } else {
+                        pUSARTHandle->pTxBuffer++;
+                        pUSARTHandle->TxLen--;
+                    }
+                } else {
+                    // 8 bit transfer
+                    pUSARTHandle->pUSARTx->DR = (*pUSARTHandle->pTxBuffer & 0x0FF);
+                    pUSARTHandle->pTxBuffer++;
+                    pUSARTHandle->TxLen--;
+                }
+            }
+            if (pUSARTHandle->TxLen == 0) {
+                pUSARTHandle->pUSARTx->CR1 &= ~(1 << USART_CR1_TXEIE);
+            }
+        }
+    }
+
+    /*************************Check for RXNE flag ********************************************/
+    temp1 = pUSARTHandle->pUSARTx->SR & (1 << USART_SR_RXNE);
+    temp2 = pUSARTHandle->pUSARTx->CR1 & (1 << USART_CR1_RXNEIE);
+
+    if (temp1 && temp2) {
+        if (pUSARTHandle->RxBusyState == USART_BUSY_IN_RX) {
+            if (pUSARTHandle->RxLen > 0) {
+                if (pUSARTHandle->USART_Config.USART_WordLength == USART_WORDLEN_9BITS) {
+                    if (pUSARTHandle->USART_Config.USART_ParityControl == USART_PARITY_DISABLE) {
+                        *(pUSARTHandle->pRxBuffer) = (pUSARTHandle->pUSARTx->DR & 0x01FF);
+
+                        pUSARTHandle->pRxBuffer += 2;
+                        pUSARTHandle->RxLen -= 2;
+                    } else {
+                        *(pUSARTHandle->pRxBuffer) = (pUSARTHandle->pUSARTx->DR & 0x0FF);
+
+                        pUSARTHandle->pRxBuffer++;
+                        pUSARTHandle->RxLen--;
+                    }
+                } else {
+                    // 8 bit receive
+                    if (pUSARTHandle->USART_Config.USART_ParityControl == USART_PARITY_DISABLE) {
+                        *pUSARTHandle->pRxBuffer = (pUSARTHandle->pUSARTx->DR & 0x0FF);
+                    } else {
+                        *pUSARTHandle->pRxBuffer = (pUSARTHandle->pUSARTx->DR & 0x07F);
+                    }
+                    pUSARTHandle->pRxBuffer++;
+                    pUSARTHandle->RxLen--;
+                }
+            }
+            if (pUSARTHandle->RxLen == 0) {
+                pUSARTHandle->pUSARTx->CR1 &= ~(1 << USART_CR1_RXNEIE);
+                pUSARTHandle->RxBusyState = USART_READY;
+                USART_ApplicationEventCallback(pUSARTHandle, USART_EVENT_RX_CMPLT);
+            }
+        }
+    }
+
+    /*************************Check for CTS flag ********************************************/
+    // Note : CTS feature is not applicable for UART4 and UART5
+
+    // Implement the code to check the status of CTS bit in the SR
+    temp1 = pUSARTHandle->pUSARTx->SR & (1 << USART_SR_CTS);
+
+    temp2 = pUSARTHandle->pUSARTx->CR3 & (1 << USART_CR3_CTSE);
+    temp3 = pUSARTHandle->pUSARTx->CR3 & (1 << USART_CR3_CTSIE);
+
+    if (temp1 && temp2 && temp3) {
+        pUSARTHandle->pUSARTx->SR &= ~(1 << USART_SR_CTS);
+        USART_ApplicationEventCallback(pUSARTHandle, USART_EVENT_CTS);
+    }
+
+    /*************************Check for IDLE detection flag ********************************************/
+    temp1 = pUSARTHandle->pUSARTx->SR & (1 << USART_SR_IDLE);
+    temp2 = pUSARTHandle->pUSARTx->CR1 & (1 << USART_CR1_IDLEIE);
+
+    if (temp1 && temp2) {
+        pUSARTHandle->pUSARTx->SR &= ~(1 << USART_SR_IDLE);
+        USART_ApplicationEventCallback(pUSARTHandle, USART_EVENT_IDLE);
+    }
+
+    /*************************Check for Overrun detection flag ********************************************/
+    temp1 = pUSARTHandle->pUSARTx->SR & (1 << USART_SR_ORE);
+    temp2 = pUSARTHandle->pUSARTx->CR1 & (1 << USART_CR1_RXNEIE);
+
+    if (temp1 && temp2) {
+        pUSARTHandle->pUSARTx->SR &= ~(1 << USART_SR_ORE);
+        USART_ApplicationEventCallback(pUSARTHandle, USART_ERR_ORE);
+    }
+
+    /*************************Check for Error Flag ********************************************/
+
+    // Noise Flag, Overrun error and Framing Error in multibuffer communication
+    // We dont discuss multibuffer communication in this course. please refer to the RM
+    // The blow code will get executed in only if multibuffer mode is used.
+
+    temp2 = pUSARTHandle->pUSARTx->CR3 & (1 << USART_CR3_EIE);
+
+    if (temp2) {
+        temp1 = pUSARTHandle->pUSARTx->SR;
+        if (temp1 & (1 << USART_SR_FE)) {
+            USART_ApplicationEventCallback(pUSARTHandle, USART_ERR_FE);
+        }
+
+        if (temp1 & (1 << USART_SR_NE)) {
+            USART_ApplicationEventCallback(pUSARTHandle, USART_ERR_NE);
+        }
+        if (temp1 & (1 << USART_SR_ORE)) {
+            USART_ApplicationEventCallback(pUSARTHandle, USART_ERR_ORE);
+        }
+    }
+}
 
 /*
  * Other Peripheral Control APIs

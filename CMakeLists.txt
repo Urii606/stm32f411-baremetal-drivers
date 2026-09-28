@@ -37,6 +37,9 @@ target_sources(${PROJECT_NAME} PRIVATE
     drivers/Src/stm32f411xx_gpio_driver.c
     drivers/Src/stm32f411xx_spi_driver.c
     drivers/Src/stm32f411xx_i2c_driver.c
+    drivers/Src/stm32f411xx_usart_driver.c
+    drivers/SRC/stm32f411xx_rcc_driver.c
+
 )
 
 # Add include directories

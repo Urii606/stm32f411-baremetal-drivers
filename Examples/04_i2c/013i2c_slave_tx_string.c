@@ -11,7 +11,9 @@ slave to read subsequent data from the slave.
 #include "stm32f411xx.h"
 #include "stm32f411xx_gpio_driver.h"
 #include "stm32f411xx_i2c_driver.h"
+#include <iso646.h>
 #include <stdint.h>
+#include <string.h>
 
 // Button description
 #define BTN_PORT GPIOA
@@ -25,68 +27,33 @@ slave to read subsequent data from the slave.
 #define I2C_AF_MODE 4
 
 #define SLAVE_ADDR 0x68
-#define OWN_ADDR 0x61
+#define OWN_ADDR SLAVE_ADDR
 
 // Module handles
 static I2C_Handle_t s_i2c_handle;
 
-// recive buffer
-uint8_t rcv_bfr[32];
+// transmit buffer
+uint8_t tx_bfr[32] = "Stm32 slave mode testing";
 
 // private functions prototype
 static void delay_approx(uint32_t count);
 static void button_init(void);
 static void i2c_gpio_init(void);
 static void i2c_module_init(void);
-static uint8_t btn_is_pressed(void);
 
 int main(void) {
-    uint8_t commandcode, len;
-
-    button_init();
     i2c_gpio_init();
+
     i2c_module_init();
+
+    I2C_IRQInterruptConfig(IRQ_NO_I2C1_EV, ENABLE);
+    I2C_IRQInterruptConfig(IRQ_NO_I2C1_ER, ENABLE);
+
+    I2C_SlaveEnableDisableCallbackEvents(I2C1, ENABLE);
 
     I2C_ManageAcking(s_i2c_handle.pI2Cx, ENABLE);
     while (1) {
-
-        if (btn_is_pressed() == 1) {
-            while (GPIO_ReadFromInputPin(BTN_PORT, BTN_PIN) == 0)
-                ;
-            
-            commandcode = 0x51;
-            I2C_MasterSendData(&s_i2c_handle, &commandcode, 1, SLAVE_ADDR,
-                               I2C_ENABLE_SR);
-            I2C_MasterRecivedData(&s_i2c_handle, &len, 1, SLAVE_ADDR,
-                                  I2C_ENABLE_SR);
-            commandcode = 0x52;
-            I2C_MasterSendData(&s_i2c_handle, &commandcode, 1, SLAVE_ADDR,
-                               I2C_ENABLE_SR);
-
-            I2C_MasterRecivedData(&s_i2c_handle, rcv_bfr, len, SLAVE_ADDR,
-                                  I2C_DISABLE_SR);
-        }
     }
-    return 0;
-}
-
-void delay_approx(uint32_t count) {
-    for (int i = 0; i < count; i++) {
-        __asm volatile("nop");
-    }
-}
-
-void button_init(void) {
-    GPIO_Handle_t btn;
-    GPIO_PeripheralClockControl(BTN_PORT, ENABLE);
-
-    btn.pGPIOx = BTN_PORT;
-    btn.GPIO_PinConfig.GPIO_PinNumber = BTN_PIN;
-    btn.GPIO_PinConfig.GPIO_PinSpeed = GPIO_SPEED_LOW;
-    btn.GPIO_PinConfig.GPIO_PinMode = GPIO_MODE_INPUT;
-    btn.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_PIN_PU;
-
-    GPIO_Init(&btn);
 }
 
 void i2c_gpio_init(void) {
@@ -121,12 +88,34 @@ void i2c_module_init(void) {
     I2C_PeripheralControl(s_i2c_handle.pI2Cx, ENABLE);
 }
 
-static uint8_t btn_is_pressed(void) {
-    if (GPIO_ReadFromInputPin(BTN_PORT, BTN_PIN) == 0) {
-        delay_approx(250000);
-        if (GPIO_ReadFromInputPin(BTN_PORT, BTN_PIN) == 0) {
-            return 1;
+void I2C1_ER_IRQHandler(void) { I2C_ER_IRQHandling(&s_i2c_handle); }
+void I2C1_EV_IRQHandler(void) { I2C_EV_IRQHandling(&s_i2c_handle); }
+
+void I2C_ApplicationEventCallback(I2C_Handle_t *pI2CHandle, uint8_t AppEv) {
+    static uint8_t commandCode = 0;
+    static uint8_t cnt = 0;
+    if (AppEv == I2C_EV_DATA_REQ) {
+
+        // master wants some data. slave has to send it
+        if (commandCode == 0x51) {
+            // send the length information to the master
+            I2C_SlaveSendData(pI2CHandle->pI2Cx, strlen((char *)tx_bfr));
+        } else if (commandCode == 0x52) {
+            // send the data of tx-buf
+            I2C_SlaveSendData(pI2CHandle->pI2Cx, tx_bfr[cnt++]);
         }
+    } else if (AppEv == I2C_EV_DATA_RCV) {
+        // data is waiting for the slave to read. slave has to read it
+        commandCode = I2C_SlaveRecivedData(pI2CHandle->pI2Cx);
+
+    } else if (AppEv == I2C_ERROR_AF) {
+        // this happens only during slave transmission
+        // master has sent the NACK. slave should understand that master doesnt
+        // need more data
+        commandCode = 0xff;
+        cnt = 0;
+    } else if (AppEv == I2C_EV_STOP) {
+        // this happens only during slave reception
+        // master has ended the I2C communication wit hthe slave
     }
-    return 0;
 }

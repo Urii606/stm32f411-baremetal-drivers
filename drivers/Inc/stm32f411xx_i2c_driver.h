@@ -2,6 +2,7 @@
 #define INC_STM32F411XX_I2C_DRIVER_H_
 
 #include "stm32f411xx.h"
+#include <stddef.h>
 #include <stdint.h>
 
 /*
@@ -47,6 +48,13 @@
 #define I2C_DISABLE_SR SET
 
 /*
+ *I2C application state
+ */
+#define I2C_READY 0
+#define I2C_BUSY_IN_RX 1
+#define I2C_BUSY_IN_TX 2
+
+/*
  * Bit position definitions for I2C_SR2 register
  */
 #define I2C_SR2_MSL 0     /* Master/Slave mode */
@@ -81,6 +89,14 @@ Handle structure for I2Cx peripheral
 typedef struct {
     I2C_RegDef_t *pI2Cx;
     I2C_Config_t I2C_Config;
+    uint8_t *pTxBuffer;
+    uint8_t *pRxBuffer;
+    uint32_t TxLen;
+    uint32_t RxLen;
+    uint8_t TxRxState;
+    uint8_t DevAddr;
+    uint32_t RxSize;
+    uint8_t Sr;
 } I2C_Handle_t;
 
 /*
@@ -117,6 +133,20 @@ typedef struct {
 #define I2C_FLAG_OVR (1 << I2C_SR1_OVR)
 #define I2C_FLAG_TIMEOUT (1 << I2C_SR1_TIMEOUT)
 
+/*
+I2C application events macros
+*/
+#define I2C_EV_RX_CMPLT 0
+#define I2C_EV_TX_CMPLT 1
+#define I2C_EV_STOP 2
+#define I2C_ERROR_BERR 3
+#define I2C_ERROR_ARLO 4
+#define I2C_ERROR_AF 5
+#define I2C_ERROR_OVR 6
+#define I2C_ERROR_TIMEOUT 7
+#define I2C_EV_DATA_REQ 8
+#define I2C_EV_DATA_RCV 9
+
 void I2C_PeripheralClockControl(I2C_RegDef_t *pI2Cx, uint8_t EnOrDi);
 
 /*
@@ -135,10 +165,28 @@ void I2C_MasterRecivedData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer,
                            uint8_t Len, uint8_t SlaveAddr, uint8_t Sr);
 
 /*
+ * Data Send and Receive with interrupt
+ */
+uint8_t I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer,
+                             uint8_t Len, uint8_t SlaveAddr, uint8_t Sr);
+uint8_t I2C_MasterRecivedDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer,
+                                uint8_t Len, uint8_t SlaveAddr, uint8_t Sr);
+
+void I2C_SlaveSendData(I2C_RegDef_t *pI2C,uint8_t data);
+uint8_t I2C_SlaveRecivedData(I2C_RegDef_t *pI2C);
+
+void I2C_CloseSendData(I2C_Handle_t *pI2CHandle);
+void I2C_CloseRecieveData(I2C_Handle_t *pI2CHandle);
+void I2C_GenerateStopCondition(I2C_RegDef_t *pI2Cx);
+
+void I2C_SlaveEnableDisableCallbackEvents(I2C_RegDef_t *pI2Cx, uint8_t EnorDI);
+/*
  * IRQ Configuration and ISR handling
  */
 void I2C_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnOrDi);
 void I2C_IRQPriorityConfig(uint8_t IRQNumber, uint32_t IRQPriority);
+void I2C_EV_IRQHandling(I2C_Handle_t *pI2CHandle);
+void I2C_ER_IRQHandling(I2C_Handle_t *pI2CHandle);
 
 /*
  * Other Peripheral Control APIs

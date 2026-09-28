@@ -1,20 +1,29 @@
-# Build output
+# Build output & Binaries
 build/
+bin/
+obj/
 *.bin
 *.elf
 *.hex
 *.o
 *.obj
 *.d
+*.map
 
-# STM32CubeMX / Eclipse internal files
+# STM32CubeIDE / Eclipse internal files
 .settings/
 mx.scratch
 *.launch
 project-description.json
 stm32cubeide-export.json
 
-# IDE local configuration
+# VS Code
 .vscode/*
 !.vscode/tasks.json
 !.vscode/launch.json
+!.vscode/settings.json
+!.vscode/c_cpp_properties.json
+
+# OS specific files
+.DS_Store
+Thumbs.db

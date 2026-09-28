@@ -10,9 +10,10 @@ The low-level driver architecture is based on the FastBit Embedded Brain Academy
 
 - **Direct Register Access:** Custom peripheral drivers written from scratch via memory-mapped peripheral structs.
 - **Hardware Peripherals Covered:**
-  - **GPIO:** Pin configuration, modes (Input, Output, Alternate Function, Analog), Pull-Up/Pull-Down, speed configuration, and software debouncing.
-  - **I2C:** Master Transmitter mode (Standard Mode 100 kHz), clock control, ACK management, address generation, and status flag handling.
+  - **USART:** Full-duplex asynchronous communication, configurable baud rates, word lengths (8/9-bit), parity control, and hardware flow control (CTS/RTS). Features robust **Interrupt (IRQ) handling** for non-blocking TX/RX (`TXE`, `TC`, `RXNE`), Idle line detection, and Error management (`ORE`, `FE`, `NE`) via application event callbacks.
+  - **I2C:** Master and Slave modes (Standard Mode 100 kHz & Fast Mode), clock control, ACK management, and address generation. Implements both Polling (blocking) and Interrupt-driven (non-blocking) data transfers.
   - **SPI:** Master/Slave transmission, hardware SS management, full-duplex communication.
+  - **GPIO:** Pin configuration, modes (Input, Output, Alternate Function, Analog), Pull-Up/Pull-Down, speed configuration, and software debouncing.
 - **Toolchain:** Modern CMake + Ninja build system with `arm-none-eabi-gcc` cross-compiler and Cortex-Debug support in VS Code.
 
 ---
@@ -45,25 +46,32 @@ The current reference application demonstrates an I2C communication bridge betwe
 
 ---
 
-### Protocol Verification (Logic Analyzer)
+## 🔍 Protocol Verification & IT Logic (Logic Analyzer)
 
-The bus transaction timing and packet integrity were verified using a logic analyzer on the SCL and SDA lines:
+Bus transaction timing, packet integrity, and interrupt-driven payload deliveries were physically verified using a logic analyzer on the SCL and SDA lines.
 
+**I2C Master Interrupt (IT) Transmission:**
 <p align="center">
-  <img src="docs/i2c_logic_capture.jpg" alt="I2C Bus Logic Analyzer Capture" width="850">
+  <img src="docs/logic-captures/i2c-interrupt-logic-capture/i2c_master_it_payload_data.png.png" alt="I2C Master IT Logic Capture" width="850">
+</p>
+
+**I2C Slave Interrupt (IT) Reception:**
+<p align="center">
+  <img src="docs/logic-captures/i2c-interrupt-logic-capture/i2c_slave_it_payload_data.png" alt="I2C Slave IT Logic Capture" width="850">
 </p>
 
 - **Bus Speed:** 100 kHz (Standard Mode).
-- **Packet Sequence:** `START` $\to$ `Address (0x68 + W)` $\to$ `ACK` $\to$ `testdata` $\to$ `ACK` $\to$ `STOP`.
+- **Packet Sequence:** `START` $\to$ `Address (0x68 + W/R)` $\to$ `ACK` $\to$ `Payload Data` $\to$ `ACK` $\to$ `STOP`.
 
 ---
 
 ## 📁 Repository Structure
 
 ```text
+├── docs/                     # Hardware setup photos and logic analyzer captures
 ├── drivers/
 │   ├── Inc/                  # Peripheral header files and register mappings
-│   └── Src/                  # Driver implementations (GPIO, I2C, SPI) and main.c
+│   └── Src/                  # Driver implementations (GPIO, I2C, SPI, USART)
 ├── Examples/                 # Functional tests and communication demos
 ├── cmake/                    # Toolchain and compiler flag definitions
 ├── CMakeLists.txt            # CMake build configuration

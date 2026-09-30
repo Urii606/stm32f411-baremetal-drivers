@@ -1,72 +1,24 @@
-# Set the minimum version of CMake that can be used
 cmake_minimum_required(VERSION 3.20)
 
-# Enable compile command to ease indexing with e.g. clangd
-set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
-set(CMAKE_C_COMPILER_FORCED TRUE)
-set(CMAKE_CXX_COMPILER_FORCED TRUE)
+project(stm32_drivers C ASM)
 
-# Set target definition variables required by the toolchain file
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/target.cmake)
-
-# Set the toolchain file for cross-compilation
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/gcc-arm-none-eabi.cmake)
-
-# Project definition
-project(stm32f4xx_drivers_clean)
-
-# Enable CMake support for ASM and C/CPP languages
-enable_language(C ASM)
-
-set(PROJECT_NAME stm32f4xx_drivers_clean)
-
-# Create an executable object type
-add_executable(${PROJECT_NAME})
-
-# Include additional CMake files for flags, components, and files
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/flags.cmake)
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/components.cmake)
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/files.cmake)
-
-# Add sources to executable/library
-target_sources(${PROJECT_NAME} PRIVATE
-    drivers/Src/main.c
-    drivers/Src/syscall.c
-    drivers/Src/sysmem.c
-    drivers/Src/startup_stm32f411xx.S
+# Створюємо статичну бібліотеку з правильними шляхами до джерел
+add_library(stm32_drivers STATIC
     drivers/Src/stm32f411xx_gpio_driver.c
     drivers/Src/stm32f411xx_spi_driver.c
     drivers/Src/stm32f411xx_i2c_driver.c
     drivers/Src/stm32f411xx_usart_driver.c
-    drivers/SRC/stm32f411xx_rcc_driver.c
-
+    drivers/Src/stm32f411xx_rcc_driver.c
+    drivers/Src/syscall.c
+    drivers/Src/sysmem.c
 )
 
-# Add include directories
-target_include_directories(${PROJECT_NAME} PRIVATE
+# Експортуємо шляхи до заголовків (Inc)
+target_include_directories(stm32_drivers PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Inc
 )
 
-# Compiler options
-target_compile_options(${PROJECT_NAME} PRIVATE
-)
-
-# Add additional defined symbols
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-)
-
-# Linker options (Standard embedded without Semihosting)
-target_link_options(${PROJECT_NAME} PRIVATE
-    --specs=nano.specs
-    --specs=nosys.specs
-    -lc
-    -lm
-)
-
-# Add additional linker search directories
-target_link_directories(${PROJECT_NAME} PRIVATE
-)
-
-# Add additional linker libraries
-target_link_libraries(${PROJECT_NAME} PRIVATE
+# Визначення мікроконтролера
+target_compile_definitions(stm32_drivers PRIVATE
+    STM32F411xE
 )

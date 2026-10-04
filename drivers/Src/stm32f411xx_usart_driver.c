@@ -38,9 +38,6 @@ void USART_PeriClockControl(USART_RegDef_t *pUSARTx, uint8_t EnOrDi) {
 void USART_Init(USART_Handle_t *pUSARTHandle) {
     uint32_t tempreg = 0;
     /***************************Configuration CR1********************* */
-
-    USART_PeripheralControl(pUSARTHandle->pUSARTx, ENABLE);
-
     // mode
     if (pUSARTHandle->USART_Config.USART_Mode == USART_MODE_ONLY_RX) {
         tempreg |= (1 << USART_CR1_RE);
@@ -275,7 +272,7 @@ void USART_IRQHandling(USART_Handle_t *pUSARTHandle) {
         if (pUSARTHandle->TxBusyState == USART_BUSY_IN_TX) {
             if (pUSARTHandle->TxLen > 0) {
                 if (pUSARTHandle->USART_Config.USART_WordLength == USART_WORDLEN_9BITS) {
-                    pdata = pUSARTHandle->pTxBuffer;
+                    pdata = (uint16_t*)pUSARTHandle->pTxBuffer;
                     pUSARTHandle->pUSARTx->DR = (*pdata & 0x01FF);
 
                     if (pUSARTHandle->USART_Config.USART_ParityControl == USART_PARITY_DISABLE) {

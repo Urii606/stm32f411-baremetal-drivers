@@ -1,5 +1,7 @@
 #include "stm32f411xx_i2c_driver.h"
 #include "stm32f411xx.h"
+#include "stm32f411xx_rcc_driver.c"
+#include <stddef.h>
 #include <stdint.h>
 
 static void I2C_GenerateStartCondition(I2C_RegDef_t *pI2Cx);
@@ -8,7 +10,6 @@ static void I2C_ExecuteAddressPhaseRead(I2C_RegDef_t *pI2Cx, uint8_t SlaveAddr);
 static void I2C_ClearAddressFlag(I2C_Handle_t *pI2CHandle);
 static void I2C_MasterHandleRXNEInterrupt(I2C_Handle_t *pI2CHandle);
 static void I2C_MasterHandleTXEInterrupt(I2C_Handle_t *pI2CHandle);
-
 
 uint8_t I2C_GetFlagStatus(I2C_RegDef_t *pI2Cx, uint32_t FlagName) {
     if (pI2Cx->SR1 & FlagName) {

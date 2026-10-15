@@ -1,5 +1,7 @@
 #include "stm32f411xx_usart_driver.h"
 #include "stm32f411xx.h"
+#include "stm32f411xx_rcc_driver.h"
+#include <stddef.h>
 #include <stdint.h>
 
 static void USART_SetBaudRate(USART_RegDef_t *pUSARTx, uint32_t BaudRate);
@@ -272,7 +274,7 @@ void USART_IRQHandling(USART_Handle_t *pUSARTHandle) {
         if (pUSARTHandle->TxBusyState == USART_BUSY_IN_TX) {
             if (pUSARTHandle->TxLen > 0) {
                 if (pUSARTHandle->USART_Config.USART_WordLength == USART_WORDLEN_9BITS) {
-                    pdata = (uint16_t*)pUSARTHandle->pTxBuffer;
+                    pdata = (uint16_t *)pUSARTHandle->pTxBuffer;
                     pUSARTHandle->pUSARTx->DR = (*pdata & 0x01FF);
 
                     if (pUSARTHandle->USART_Config.USART_ParityControl == USART_PARITY_DISABLE) {
